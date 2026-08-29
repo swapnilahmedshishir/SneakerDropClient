@@ -3,6 +3,7 @@ import { useAppDispatch, useAppSelector } from '../../app/hooks';
 import { useStockSocket } from '../../sockets/useStockSocket';
 import { fetchActiveDrops } from './dropsSlice';
 import DropCard from './DropCard';
+import ShopperSelect from './ShopperSelect';
 
 function DropsDashboard() {
   const dispatch = useAppDispatch();
@@ -26,6 +27,7 @@ function DropsDashboard() {
               Live active drops — stock updates in real time.
             </p>
           </div>
+          <ShopperSelect />
         </div>
       </header>
 

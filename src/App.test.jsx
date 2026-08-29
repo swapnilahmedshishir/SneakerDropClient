@@ -1,14 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import App from './App';
 import dropsReducer from './features/drops/dropsSlice';
+import reservationsReducer from './features/reservations/reservationsSlice';
+import userReducer from './features/user/userSlice';
 import { getActiveDrops } from './services/api';
 import { getSocket } from './sockets/socket';
 
 vi.mock('./services/api', () => ({
   getActiveDrops: vi.fn(),
+  reserveActiveDrop: vi.fn(),
+  purchaseReservation: vi.fn(),
   apiClient: {},
 }));
 
@@ -27,6 +31,9 @@ function createFakeSocket() {
     }),
     emitStockUpdated(payload) {
       handlers.stock_updated?.(payload);
+    },
+    emitReservationExpired(payload) {
+      handlers.reservation_expired?.(payload);
     },
   };
   return fake;
@@ -51,8 +58,15 @@ const ACTIVE_DROPS = [
   },
 ];
 
-function renderApp() {
-  const store = configureStore({ reducer: { drops: dropsReducer } });
+function renderApp(preloadedState) {
+  const store = configureStore({
+    reducer: {
+      drops: dropsReducer,
+      reservations: reservationsReducer,
+      user: userReducer,
+    },
+    preloadedState,
+  });
   return render(
     <Provider store={store}>
       <App />
@@ -155,10 +169,59 @@ describe('Active drops dashboard', () => {
 
     expect(fake.connect).toHaveBeenCalledTimes(1);
     expect(fake.on).toHaveBeenCalledWith('stock_updated', expect.any(Function));
+    expect(fake.on).toHaveBeenCalledWith('reservation_expired', expect.any(Function));
 
     view.unmount();
 
     expect(fake.off).toHaveBeenCalledWith('stock_updated', expect.any(Function));
+    expect(fake.off).toHaveBeenCalledWith('reservation_expired', expect.any(Function));
     expect(fake.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows Reservation Expired when the backend broadcasts reservation_expired', async () => {
+    const fake = getSocket();
+    getActiveDrops.mockResolvedValue({ success: true, data: [ACTIVE_DROPS[0]] });
+
+    // Preloaded active reservation for shopper 1 on drop 1; expiresAt is
+    // relative to now so the card is comfortably inside its countdown.
+    renderApp({
+      drops: { items: [ACTIVE_DROPS[0]], loading: false, error: null },
+      user: { id: 1 },
+      reservations: {
+        byDropId: {
+          1: {
+            id: 5,
+            dropId: 1,
+            userId: 1,
+            status: 'ACTIVE',
+            expiresAt: new Date(Date.now() + 59_000).toISOString(),
+          },
+        },
+      },
+    });
+
+    expect(await screen.findByText('Reserved ✓')).toBeInTheDocument();
+
+    // Backend (expiration worker) expired the reservation -> socket event.
+    act(() => {
+      fake.emitReservationExpired({ reservationId: 5, dropId: 1 });
+    });
+
+    expect(await screen.findByText('Reservation Expired')).toBeInTheDocument();
+    expect(screen.queryByText('Reserved ✓')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Complete Purchase/ })).not.toBeInTheDocument();
+  });
+
+  it('lets a shopper pick a different user in the header control', async () => {
+    getActiveDrops.mockResolvedValue({ success: true, data: ACTIVE_DROPS });
+
+    renderApp();
+    await screen.findByText('Air Jordan 1');
+
+    const select = screen.getByRole('combobox', { name: 'Choose shopper' });
+    expect(select).toHaveValue('1');
+
+    fireEvent.change(select, { target: { value: '2' } });
+    expect(select).toHaveValue('2');
   });
 });

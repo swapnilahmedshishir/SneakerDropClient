@@ -19,3 +19,24 @@ export async function getActiveDrops() {
   const response = await apiClient.get('/drops/active');
   return response.data;
 }
+
+/**
+ * POST /api/drops/:dropId/reserve
+ * Creates a 60-second ACTIVE reservation. The response includes the
+ * server-assigned `expiresAt`, which the dashboard uses for its countdown —
+ * the frontend timer is only a display, never the source of truth.
+ */
+export async function reserveActiveDrop(dropId, userId) {
+  const response = await apiClient.post(`/drops/${dropId}/reserve`, { userId });
+  return response.data;
+}
+
+/**
+ * POST /api/reservations/:reservationId/purchase
+ * Completes the purchase while the reservation is still ACTIVE and unexpired.
+ * The backend (not the client timer) decides whether it is valid.
+ */
+export async function purchaseReservation(reservationId, userId) {
+  const response = await apiClient.post(`/reservations/${reservationId}/purchase`, { userId });
+  return response.data;
+}
