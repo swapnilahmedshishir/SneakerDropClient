@@ -1,17 +1,11 @@
-# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
 # SneakerDropClient
+
+React 19 + Vite + Redux Toolkit + Tailwind CSS 4 dashboard for the Limited Edition Sneaker Drop assessment, with live stock/expiry updates over socket.io-client.
+
+- Active-drops dashboard with reserve → countdown → purchase flow
+- Realtime `stock_updated` / `reservation_expired` handling (no refresh needed)
+- Shopper switcher and toast notifications
+- Vitest + Testing Library suites (`npm test`), oxlint (`npm run lint`), Vite build (`npm run build`)
+
+👉 **Full assessment documentation:** see the [root README](../README.md) (architecture, concurrency strategy, schema, API reference, setup).
+
