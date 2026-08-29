@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useAppDispatch } from '../app/hooks';
 import { updateDropStock } from '../features/drops/dropsSlice';
 import { markReservationExpired } from '../features/reservations/reservationsSlice';
+import { pushToast } from '../features/toast/toastSlice';
 import { getSocket } from './socket';
 
 /**
@@ -23,7 +24,21 @@ export function useStockSocket() {
     };
 
     const handleReservationExpired = (payload) => {
-      dispatch(markReservationExpired({ dropId: payload.dropId }));
+      // The backend is the authority on expiry — apply it unconditionally (it
+      // is a no-op when this shopper has no cached reservation for the drop).
+      // Only raise a toast when it is actually *our* reservation that expired.
+      dispatch((innerDispatch, getState) => {
+        const reservation = getState().reservations.byDropId[payload.dropId];
+        if (reservation?.status === 'ACTIVE') {
+          innerDispatch(
+            pushToast({
+              type: 'error',
+              message: 'Your reservation expired before the purchase was completed.',
+            })
+          );
+        }
+        innerDispatch(markReservationExpired({ dropId: payload.dropId }));
+      });
     };
 
     socket.on('stock_updated', handleStockUpdated);

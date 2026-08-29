@@ -4,6 +4,8 @@ import { useStockSocket } from '../../sockets/useStockSocket';
 import { fetchActiveDrops } from './dropsSlice';
 import DropCard from './DropCard';
 import ShopperSelect from './ShopperSelect';
+import ToastContainer from '../toast/ToastContainer';
+
 
 function DropsDashboard() {
   const dispatch = useAppDispatch();
@@ -56,12 +58,13 @@ function DropsDashboard() {
             <button
               type="button"
               onClick={() => dispatch(fetchActiveDrops())}
-              className="mt-4 rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-800"
+              className="mt-4 rounded-lg bg-red-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-700 focus-visible:ring-offset-2"
             >
               Try again
             </button>
           </div>
         )}
+
 
         {!loading && !error && items.length === 0 && (
           <div className="py-24 text-center text-gray-500">
@@ -77,6 +80,9 @@ function DropsDashboard() {
           </div>
         )}
       </main>
+
+      {/* Transient global feedback (success / error toasts). */}
+      <ToastContainer />
     </div>
   );
 }

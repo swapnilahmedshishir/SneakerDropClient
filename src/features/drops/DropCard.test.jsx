@@ -41,6 +41,10 @@ const ACTIVE_RESERVATION = {
 
 const PURCHASE = { id: 500, userId: 1, dropId: 3, reservationId: 101 };
 
+// Must match DropCard's user-friendly network failure message (the component
+// deliberately replaces axios' raw "Network Error" text).
+const NETWORK_ERROR_TEXT = 'Network error — please check your connection and try again.';
+
 function makeStore({ reservation } = {}) {
   return configureStore({
     reducer: { drops: dropsReducer, user: userReducer, reservations: reservationsReducer },
@@ -171,7 +175,53 @@ describe('DropCard reservation flow', () => {
     renderCard();
     fireEvent.click(screen.getByRole('button', { name: 'Reserve Adidas Yeezy Boost 350' }));
 
-    expect(await screen.findByText('Network Error')).toBeInTheDocument();
+    expect(await screen.findByText(NETWORK_ERROR_TEXT)).toBeInTheDocument();
+  });
+
+  it('ignores rapid duplicate clicks while the reserve request is pending', async () => {
+    reserveActiveDrop.mockReturnValue(new Promise(() => {})); // never resolves
+
+    renderCard();
+    const reserveButton = screen.getByRole('button', { name: 'Reserve Adidas Yeezy Boost 350' });
+
+    // Two clicks inside the same tick, before React re-renders the disabled state.
+    fireEvent.click(reserveButton);
+    fireEvent.click(reserveButton);
+    await act(async () => {});
+
+    expect(reserveActiveDrop).toHaveBeenCalledTimes(1);
+    expect(reserveButton).toBeDisabled();
+    expect(reserveButton).toHaveAttribute('aria-busy', 'true');
+    expect(reserveButton).toHaveTextContent('Reserving...');
+  });
+
+  it('keeps other product cards interactive while one card has a pending request', async () => {
+    reserveActiveDrop.mockReturnValue(new Promise(() => {})); // never resolves
+    const otherDrop = { ...DROP, id: 4, name: 'Nike Dunk Low' };
+
+    const store = configureStore({
+      reducer: { drops: dropsReducer, user: userReducer, reservations: reservationsReducer },
+      preloadedState: {
+        drops: { items: [DROP, otherDrop], loading: false, error: null },
+        user: { id: 1 },
+        reservations: { byDropId: {} },
+      },
+    });
+    render(
+      <Provider store={store}>
+        <DropCard drop={DROP} />
+        <DropCard drop={otherDrop} />
+      </Provider>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reserve Adidas Yeezy Boost 350' }));
+    await act(async () => {});
+
+    expect(screen.getByRole('button', { name: 'Reserve Adidas Yeezy Boost 350' })).toBeDisabled();
+    // The unrelated card stays usable — pending state is per card, never global.
+    expect(
+      screen.getByRole('button', { name: 'Reserve Nike Dunk Low' })
+    ).toBeEnabled();
   });
 
   it('runs Complete Purchase -> Processing... -> Purchase Complete', async () => {

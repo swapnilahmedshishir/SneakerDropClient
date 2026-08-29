@@ -5,6 +5,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import App from './App';
 import dropsReducer from './features/drops/dropsSlice';
 import reservationsReducer from './features/reservations/reservationsSlice';
+import toastReducer from './features/toast/toastSlice';
 import userReducer from './features/user/userSlice';
 import { getActiveDrops } from './services/api';
 import { getSocket } from './sockets/socket';
@@ -65,6 +66,7 @@ function renderApp(preloadedState) {
     reducer: {
       drops: dropsReducer,
       reservations: reservationsReducer,
+      toast: toastReducer,
       user: userReducer,
     },
     preloadedState,

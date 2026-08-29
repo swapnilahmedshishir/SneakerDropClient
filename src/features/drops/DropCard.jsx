@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../app/hooks';
+import { pushToast } from '../toast/toastSlice';
 import {
   markReservationExpired,
   markReservationPurchased,
@@ -19,7 +20,15 @@ function formatPrice(price) {
 }
 
 const RESERVE_BUTTON_CLASSES =
-  'w-full rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white transition-colors hover:bg-gray-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400';
+  'w-full rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white transition-colors hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400';
+
+const PURCHASE_BUTTON_CLASSES =
+  'mt-2 w-full rounded-lg bg-emerald-700 px-4 py-2.5 font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-600';
+
+// Network failures carry no HTTP status — give them a clearer message than
+// axios' bare "Network Error".
+const NETWORK_ERROR_MESSAGE = 'Network error — please check your connection and try again.';
+const SERVER_ERROR_MESSAGE = 'Server error — please try again in a moment.';
 
 /**
  * The live stage of an ACTIVE reservation: countdown + Complete Purchase.
@@ -65,7 +74,8 @@ function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurc
         onClick={onPurchase}
         disabled={purchasing}
         aria-label={`Complete purchase for ${name}`}
-        className="mt-2 w-full rounded-lg bg-emerald-700 px-4 py-2.5 font-medium text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-600"
+        aria-busy={purchasing}
+        className={PURCHASE_BUTTON_CLASSES}
       >
         {purchasing ? 'Processing...' : 'Complete Purchase'}
       </button>
@@ -83,50 +93,99 @@ function DropCard({ drop }) {
   const reservation = useAppSelector((state) => state.reservations.byDropId[id]);
 
   // Transient UI state only — the reservation itself lives in Redux.
+  // Inline errors persist until the next action on this card clears them;
+  // the toast layer provides the transient feedback.
   const [reserving, setReserving] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-
+  // Ref-based guard against double clicks within the same tick (the disabled
+  // attribute alone can be raced by rapid double clicks before re-render).
+  const pendingRef = useRef(false);
   const outOfStock = availableStock <= 0;
-  const isActive = reservation?.status === 'ACTIVE';
-  const isExpired = reservation?.status === 'EXPIRED';
   const isPurchased = reservation?.status === 'PURCHASED';
+  const isExpired = reservation?.status === 'EXPIRED';
+  const isActive = reservation?.status === 'ACTIVE';
 
   async function handleReserve() {
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setError(null);
     setNotice(null);
     setReserving(true);
-    const result = await dispatch(reserveDrop(id));
-    setReserving(false);
-    if (reserveDrop.rejected.match(result)) {
-      setError(result.payload?.message ?? 'Reservation failed. Please try again.');
+    try {
+      const result = await dispatch(reserveDrop(id));
+      if (reserveDrop.rejected.match(result)) {
+        const { status, message } = result.payload ?? {};
+        if (status === 0) {
+          // Axios never got a response — a network failure, not a server answer.
+          setError(NETWORK_ERROR_MESSAGE);
+          dispatch(pushToast({ type: 'error', message: NETWORK_ERROR_MESSAGE }));
+        } else if (status === 409) {
+          setError(message ?? 'This drop is sold out — no pairs left to reserve.');
+        } else if (status >= 500) {
+          setError(SERVER_ERROR_MESSAGE);
+          dispatch(pushToast({ type: 'error', message: SERVER_ERROR_MESSAGE }));
+        } else {
+          setError(message ?? 'Reservation failed. Please try again.');
+        }
+      } else {
+        dispatch(
+          pushToast({
+            type: 'success',
+            message: `Pair of ${name} reserved — complete your purchase within 1 minute.`,
+          })
+        );
+      }
+    } finally {
+      setReserving(false);
+      pendingRef.current = false;
     }
   }
 
   async function handlePurchase() {
     if (!reservation || isExpired || isPurchased) return;
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setError(null);
     setNotice(null);
     setPurchasing(true);
-    const result = await dispatch(purchaseReservation(reservation.id));
-    setPurchasing(false);
-    if (purchaseReservation.rejected.match(result)) {
-      const { status, message } = result.payload ?? {};
-      if (status === 410) {
-        // The backend just confirmed the reservation is expired.
-        dispatch(markReservationExpired({ dropId: id }));
-        setError(message ?? 'Reservation has expired.');
-      } else if (
-        status === 409 &&
-        typeof message === 'string' &&
-        message.toLowerCase().includes('already been purchased')
-      ) {
-        dispatch(markReservationPurchased({ dropId: id }));
-        setNotice('This pair was already purchased for this reservation.');
+    try {
+      const result = await dispatch(purchaseReservation(reservation.id));
+      if (purchaseReservation.rejected.match(result)) {
+        const { status, message } = result.payload ?? {};
+        if (status === 0) {
+          setError(NETWORK_ERROR_MESSAGE);
+          dispatch(pushToast({ type: 'error', message: NETWORK_ERROR_MESSAGE }));
+        } else if (status === 410) {
+          // The backend just confirmed the reservation is expired.
+          dispatch(markReservationExpired({ dropId: id }));
+          setError(message ?? 'Reservation has expired.');
+        } else if (
+          status === 409 &&
+          typeof message === 'string' &&
+          message.toLowerCase().includes('already been purchased')
+        ) {
+          dispatch(markReservationPurchased({ dropId: id }));
+          setNotice('This pair was already purchased for this reservation.');
+        } else if (status === 403) {
+          setError(message ?? 'Only the shopper who reserved this pair can purchase it.');
+        } else if (status === 404) {
+          setError(message ?? 'Reservation not found — it may have already been processed.');
+        } else if (status >= 500) {
+          setError(SERVER_ERROR_MESSAGE);
+          dispatch(pushToast({ type: 'error', message: SERVER_ERROR_MESSAGE }));
+        } else {
+          setError(message ?? 'Purchase failed. Please try again.');
+        }
       } else {
-        setError(message ?? 'Purchase failed. Please try again.');
+        dispatch(
+          pushToast({ type: 'success', message: `Purchase complete — enjoy your pair of ${name}!` })
+        );
       }
+    } finally {
+      setPurchasing(false);
+      pendingRef.current = false;
     }
   }
 
@@ -136,6 +195,10 @@ function DropCard({ drop }) {
       onClick={handleReserve}
       disabled={reserving || outOfStock}
       aria-label={`Reserve ${name}`}
+      aria-busy={reserving}
+      // Out-of-stock reason is exposed via a visually hidden hint so the
+      // visible "Out of stock" text stays unique to the stock badge above.
+      aria-describedby={outOfStock ? `out-of-stock-hint-${id}` : undefined}
       className={RESERVE_BUTTON_CLASSES}
     >
       {reserving ? 'Reserving...' : 'Reserve'}
@@ -143,7 +206,10 @@ function DropCard({ drop }) {
   );
 
   return (
-    <article className="flex flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md">
+    <article
+      aria-label={`${name} product card`}
+      className="flex flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+    >
       <div className="mb-4 flex items-start justify-between gap-3">
         <h2 className="text-lg font-semibold leading-tight text-gray-900">{name}</h2>
         <span className="shrink-0 text-sm font-medium text-gray-400">#{id}</span>
@@ -153,10 +219,20 @@ function DropCard({ drop }) {
 
       <div className="mt-3 mb-4">
         <span
+          aria-label={
+            outOfStock
+              ? `No stock available for ${name}`
+              : `${availableStock} pairs available for ${name}`
+          }
           className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${getStockVariant(availableStock)}`}
         >
           {outOfStock ? 'Out of stock' : `${availableStock} available`}
         </span>
+        {outOfStock && (
+          <span id={`out-of-stock-hint-${id}`} className="sr-only">
+            Out of stock — cannot reserve {name}
+          </span>
+        )}
       </div>
 
       <div className="mb-6">
@@ -164,7 +240,10 @@ function DropCard({ drop }) {
           Recent purchasers
         </h3>
         {recentPurchasers.length > 0 ? (
-          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+          <ul
+            className="mt-1.5 flex flex-wrap gap-1.5"
+            aria-label={`Recent purchasers of ${name}: ${recentPurchasers.join(', ')}`}
+          >
             {recentPurchasers.map((username, index) => (
               <li
                 key={`${username}-${index}`}
@@ -214,7 +293,9 @@ function DropCard({ drop }) {
           </p>
         )}
         {notice && (
-          <p className="mt-3 text-sm font-medium text-emerald-700">{notice}</p>
+          <p role="status" className="mt-3 text-sm font-medium text-emerald-700">
+            {notice}
+          </p>
         )}
       </div>
     </article>
