@@ -215,3 +215,64 @@ describe('DropCard reservation flow', () => {
     expect(screen.queryByRole('button', { name: /Complete Purchase/ })).not.toBeInTheDocument();
   });
 });
+
+describe('DropCard recent purchasers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders up to three recent purchasers, in server order', () => {
+    render(
+      <Provider store={makeStore()}>
+        <DropCard
+          drop={{
+            ...DROP,
+            recentPurchasers: [
+              { username: 'david' },
+              { username: 'hasan' },
+              { username: 'karim' },
+              { username: 'should-be-cut' },
+            ],
+          }}
+        />
+      </Provider>
+    );
+
+    expect(screen.getByText('Recent purchasers')).toBeInTheDocument();
+    const chips = screen.getAllByTestId('recent-purchaser');
+    expect(chips.map((chip) => chip.textContent)).toEqual(['david', 'hasan', 'karim']);
+    expect(screen.queryByText('should-be-cut')).not.toBeInTheDocument();
+  });
+
+  it('shows only the purchasers that exist when fewer than three', () => {
+    render(
+      <Provider store={makeStore()}>
+        <DropCard drop={{ ...DROP, recentPurchasers: [{ username: 'sadia' }] }} />
+      </Provider>
+    );
+
+    expect(screen.getByText('sadia')).toBeInTheDocument();
+    expect(screen.getAllByTestId('recent-purchaser')).toHaveLength(1);
+    expect(screen.queryByText('No purchases yet')).not.toBeInTheDocument();
+  });
+
+  it('shows an empty state when no purchases exist or the field is missing', () => {
+    render(
+      <Provider store={makeStore()}>
+        <DropCard drop={{ ...DROP, recentPurchasers: [] }} />
+      </Provider>
+    );
+
+    expect(screen.getByText('No purchases yet')).toBeInTheDocument();
+    expect(screen.queryByTestId('recent-purchaser')).not.toBeInTheDocument();
+
+    // Legacy payloads without the field must render the empty state, not crash.
+    render(
+      <Provider store={makeStore()}>
+        <DropCard drop={{ ...DROP, id: 99, name: 'Legacy Drop' }} />
+      </Provider>
+    );
+
+    expect(screen.getAllByText('No purchases yet')).toHaveLength(2);
+  });
+});

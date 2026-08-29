@@ -76,6 +76,10 @@ function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurc
 function DropCard({ drop }) {
   const dispatch = useAppDispatch();
   const { id, name, price, availableStock } = drop;
+  const recentPurchasers = (drop.recentPurchasers ?? [])
+    .map((purchaser) => purchaser?.username)
+    .filter(Boolean)
+    .slice(0, 3);
   const reservation = useAppSelector((state) => state.reservations.byDropId[id]);
 
   // Transient UI state only — the reservation itself lives in Redux.
@@ -147,12 +151,33 @@ function DropCard({ drop }) {
 
       <p className="text-2xl font-bold text-gray-900">{formatPrice(price)}</p>
 
-      <div className="mt-3 mb-6">
+      <div className="mt-3 mb-4">
         <span
           className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${getStockVariant(availableStock)}`}
         >
           {outOfStock ? 'Out of stock' : `${availableStock} available`}
         </span>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          Recent purchasers
+        </h3>
+        {recentPurchasers.length > 0 ? (
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {recentPurchasers.map((username, index) => (
+              <li
+                key={`${username}-${index}`}
+                data-testid="recent-purchaser"
+                className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700"
+              >
+                {username}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1.5 text-xs italic text-gray-400">No purchases yet</p>
+        )}
       </div>
 
       <div className="mt-auto">

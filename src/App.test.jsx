@@ -47,6 +47,7 @@ const ACTIVE_DROPS = [
     totalStock: 5,
     availableStock: 5,
     startsAt: '2026-08-29T00:00:00.000Z',
+    recentPurchasers: [{ username: 'david' }, { username: 'hasan' }, { username: 'karim' }],
   },
   {
     id: 2,
@@ -55,6 +56,7 @@ const ACTIVE_DROPS = [
     totalStock: 3,
     availableStock: 1,
     startsAt: '2026-08-29T00:00:00.000Z',
+    recentPurchasers: [],
   },
 ];
 
@@ -223,5 +225,19 @@ describe('Active drops dashboard', () => {
 
     fireEvent.change(select, { target: { value: '2' } });
     expect(select).toHaveValue('2');
+  });
+
+  it('shows each drop recent purchasers, capped at 3, with an empty state when none exist', async () => {
+    getActiveDrops.mockResolvedValue({ success: true, data: ACTIVE_DROPS });
+
+    renderApp();
+    await screen.findByText('Air Jordan 1');
+
+    // Drop 1: the server's top 3, in order.
+    const purchaserChips = screen.getAllByTestId('recent-purchaser');
+    expect(purchaserChips.map((chip) => chip.textContent)).toEqual(['david', 'hasan', 'karim']);
+
+    // Drop 2 has no purchases -> empty state, not chips.
+    expect(screen.getByText('No purchases yet')).toBeInTheDocument();
   });
 });
