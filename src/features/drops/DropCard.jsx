@@ -1,18 +1,18 @@
-import { useRef, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../app/hooks';
-import { pushToast } from '../toast/toastSlice';
+import { useRef, useState } from "react";
+import { useAppDispatch, useAppSelector } from "../../app/hooks";
+import { pushToast } from "../toast/toastSlice";
 import {
   markReservationExpired,
   markReservationPurchased,
   purchaseReservation,
   reserveDrop,
-} from '../reservations/reservationsSlice';
-import { formatCountdown, useCountdown } from './useCountdown';
+} from "../reservations/reservationsSlice";
+import { formatCountdown, useCountdown } from "./useCountdown";
 
 function getStockVariant(availableStock) {
-  if (availableStock <= 0) return 'bg-red-50 text-red-700 border-red-200';
-  if (availableStock <= 3) return 'bg-amber-50 text-amber-700 border-amber-200';
-  return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (availableStock <= 0) return "bg-red-50 text-red-700 border-red-200";
+  if (availableStock <= 3) return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-emerald-50 text-emerald-700 border-emerald-200";
 }
 
 function formatPrice(price) {
@@ -20,24 +20,24 @@ function formatPrice(price) {
 }
 
 const RESERVE_BUTTON_CLASSES =
-  'w-full rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white transition-colors hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400';
+  "w-full rounded-lg bg-gray-900 px-4 py-2.5 font-medium text-white transition-colors hover:bg-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-900 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400";
 
 const PURCHASE_BUTTON_CLASSES =
-  'mt-2 w-full rounded-lg bg-emerald-700 px-4 py-2.5 font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-600';
+  "mt-2 w-full rounded-lg bg-emerald-700 px-4 py-2.5 font-medium text-white transition-colors hover:bg-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:text-emerald-600";
 
 // Network failures carry no HTTP status — give them a clearer message than
 // axios' bare "Network Error".
-const NETWORK_ERROR_MESSAGE = 'Network error — please check your connection and try again.';
-const SERVER_ERROR_MESSAGE = 'Server error — please try again in a moment.';
+const NETWORK_ERROR_MESSAGE =
+  "Network error — please check your connection and try again.";
+const SERVER_ERROR_MESSAGE = "Server error — please try again in a moment.";
 
-/**
- * The live stage of an ACTIVE reservation: countdown + Complete Purchase.
- * Mounted with key={reservation.id} so the countdown always starts from the
- * server-provided expiresAt. When the timer reaches zero this shows
- * "Reservation Expired" — a pure client display. The server remains the
- * authority; its `reservation_expired` event / a 410 updates the store status.
- */
-function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurchase }) {
+function ReservationPanel({
+  reservation,
+  name,
+  purchasing,
+  reserveButton,
+  onPurchase,
+}) {
   const remainingMs = useCountdown(reservation.expiresAt);
   const timerExpired = remainingMs <= 0;
 
@@ -48,7 +48,8 @@ function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurc
           Reservation Expired
         </div>
         <p className="mb-3 text-center text-xs text-gray-500">
-          Your reservation is no longer valid. You can reserve again if stock allows.
+          Your reservation is no longer valid. You can reserve again if stock
+          allows.
         </p>
         {reserveButton}
       </div>
@@ -58,7 +59,9 @@ function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurc
   return (
     <div>
       <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-        <span className="text-sm font-semibold text-emerald-800">Reserved ✓</span>
+        <span className="text-sm font-semibold text-emerald-800">
+          Reserved ✓
+        </span>
         <span
           data-testid="countdown"
           className="font-mono text-lg font-bold tabular-nums text-emerald-800"
@@ -67,7 +70,8 @@ function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurc
         </span>
       </div>
       <p className="mt-2 text-xs text-gray-500">
-        Complete the purchase before the timer ends — the server enforces expiry.
+        Complete the purchase before the timer ends — the server enforces
+        expiry.
       </p>
       <button
         type="button"
@@ -77,7 +81,7 @@ function ReservationPanel({ reservation, name, purchasing, reserveButton, onPurc
         aria-busy={purchasing}
         className={PURCHASE_BUTTON_CLASSES}
       >
-        {purchasing ? 'Processing...' : 'Complete Purchase'}
+        {purchasing ? "Processing..." : "Complete Purchase"}
       </button>
     </div>
   );
@@ -90,7 +94,9 @@ function DropCard({ drop }) {
     .map((purchaser) => purchaser?.username)
     .filter(Boolean)
     .slice(0, 3);
-  const reservation = useAppSelector((state) => state.reservations.byDropId[id]);
+  const reservation = useAppSelector(
+    (state) => state.reservations.byDropId[id],
+  );
 
   // Transient UI state only — the reservation itself lives in Redux.
   // Inline errors persist until the next action on this card clears them;
@@ -103,9 +109,9 @@ function DropCard({ drop }) {
   // attribute alone can be raced by rapid double clicks before re-render).
   const pendingRef = useRef(false);
   const outOfStock = availableStock <= 0;
-  const isPurchased = reservation?.status === 'PURCHASED';
-  const isExpired = reservation?.status === 'EXPIRED';
-  const isActive = reservation?.status === 'ACTIVE';
+  const isPurchased = reservation?.status === "PURCHASED";
+  const isExpired = reservation?.status === "EXPIRED";
+  const isActive = reservation?.status === "ACTIVE";
 
   async function handleReserve() {
     if (pendingRef.current) return;
@@ -120,21 +126,25 @@ function DropCard({ drop }) {
         if (status === 0) {
           // Axios never got a response — a network failure, not a server answer.
           setError(NETWORK_ERROR_MESSAGE);
-          dispatch(pushToast({ type: 'error', message: NETWORK_ERROR_MESSAGE }));
+          dispatch(
+            pushToast({ type: "error", message: NETWORK_ERROR_MESSAGE }),
+          );
         } else if (status === 409) {
-          setError(message ?? 'This drop is sold out — no pairs left to reserve.');
+          setError(
+            message ?? "This drop is sold out — no pairs left to reserve.",
+          );
         } else if (status >= 500) {
           setError(SERVER_ERROR_MESSAGE);
-          dispatch(pushToast({ type: 'error', message: SERVER_ERROR_MESSAGE }));
+          dispatch(pushToast({ type: "error", message: SERVER_ERROR_MESSAGE }));
         } else {
-          setError(message ?? 'Reservation failed. Please try again.');
+          setError(message ?? "Reservation failed. Please try again.");
         }
       } else {
         dispatch(
           pushToast({
-            type: 'success',
+            type: "success",
             message: `Pair of ${name} reserved — complete your purchase within 1 minute.`,
-          })
+          }),
         );
       }
     } finally {
@@ -156,31 +166,42 @@ function DropCard({ drop }) {
         const { status, message } = result.payload ?? {};
         if (status === 0) {
           setError(NETWORK_ERROR_MESSAGE);
-          dispatch(pushToast({ type: 'error', message: NETWORK_ERROR_MESSAGE }));
+          dispatch(
+            pushToast({ type: "error", message: NETWORK_ERROR_MESSAGE }),
+          );
         } else if (status === 410) {
           // The backend just confirmed the reservation is expired.
           dispatch(markReservationExpired({ dropId: id }));
-          setError(message ?? 'Reservation has expired.');
+          setError(message ?? "Reservation has expired.");
         } else if (
           status === 409 &&
-          typeof message === 'string' &&
-          message.toLowerCase().includes('already been purchased')
+          typeof message === "string" &&
+          message.toLowerCase().includes("already been purchased")
         ) {
           dispatch(markReservationPurchased({ dropId: id }));
-          setNotice('This pair was already purchased for this reservation.');
+          setNotice("This pair was already purchased for this reservation.");
         } else if (status === 403) {
-          setError(message ?? 'Only the shopper who reserved this pair can purchase it.');
+          setError(
+            message ??
+              "Only the shopper who reserved this pair can purchase it.",
+          );
         } else if (status === 404) {
-          setError(message ?? 'Reservation not found — it may have already been processed.');
+          setError(
+            message ??
+              "Reservation not found — it may have already been processed.",
+          );
         } else if (status >= 500) {
           setError(SERVER_ERROR_MESSAGE);
-          dispatch(pushToast({ type: 'error', message: SERVER_ERROR_MESSAGE }));
+          dispatch(pushToast({ type: "error", message: SERVER_ERROR_MESSAGE }));
         } else {
-          setError(message ?? 'Purchase failed. Please try again.');
+          setError(message ?? "Purchase failed. Please try again.");
         }
       } else {
         dispatch(
-          pushToast({ type: 'success', message: `Purchase complete — enjoy your pair of ${name}!` })
+          pushToast({
+            type: "success",
+            message: `Purchase complete — enjoy your pair of ${name}!`,
+          }),
         );
       }
     } finally {
@@ -201,7 +222,7 @@ function DropCard({ drop }) {
       aria-describedby={outOfStock ? `out-of-stock-hint-${id}` : undefined}
       className={RESERVE_BUTTON_CLASSES}
     >
-      {reserving ? 'Reserving...' : 'Reserve'}
+      {reserving ? "Reserving..." : "Reserve"}
     </button>
   );
 
@@ -211,8 +232,12 @@ function DropCard({ drop }) {
       className="flex flex-col rounded-xl border border-gray-200 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <h2 className="text-lg font-semibold leading-tight text-gray-900">{name}</h2>
-        <span className="shrink-0 text-sm font-medium text-gray-400">#{id}</span>
+        <h2 className="text-lg font-semibold leading-tight text-gray-900">
+          {name}
+        </h2>
+        <span className="shrink-0 text-sm font-medium text-gray-400">
+          #{id}
+        </span>
       </div>
 
       <p className="text-2xl font-bold text-gray-900">{formatPrice(price)}</p>
@@ -226,7 +251,7 @@ function DropCard({ drop }) {
           }
           className={`inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium ${getStockVariant(availableStock)}`}
         >
-          {outOfStock ? 'Out of stock' : `${availableStock} available`}
+          {outOfStock ? "Out of stock" : `${availableStock} available`}
         </span>
         {outOfStock && (
           <span id={`out-of-stock-hint-${id}`} className="sr-only">
@@ -242,7 +267,7 @@ function DropCard({ drop }) {
         {recentPurchasers.length > 0 ? (
           <ul
             className="mt-1.5 flex flex-wrap gap-1.5"
-            aria-label={`Recent purchasers of ${name}: ${recentPurchasers.join(', ')}`}
+            aria-label={`Recent purchasers of ${name}: ${recentPurchasers.join(", ")}`}
           >
             {recentPurchasers.map((username, index) => (
               <li
@@ -255,7 +280,9 @@ function DropCard({ drop }) {
             ))}
           </ul>
         ) : (
-          <p className="mt-1.5 text-xs italic text-gray-400">No purchases yet</p>
+          <p className="mt-1.5 text-xs italic text-gray-400">
+            No purchases yet
+          </p>
         )}
       </div>
 
@@ -270,7 +297,8 @@ function DropCard({ drop }) {
               Reservation Expired
             </div>
             <p className="mb-3 text-center text-xs text-gray-500">
-              Your reservation is no longer valid. You can reserve again if stock allows.
+              Your reservation is no longer valid. You can reserve again if
+              stock allows.
             </p>
             {reserveButton}
           </div>
@@ -293,7 +321,10 @@ function DropCard({ drop }) {
           </p>
         )}
         {notice && (
-          <p role="status" className="mt-3 text-sm font-medium text-emerald-700">
+          <p
+            role="status"
+            className="mt-3 text-sm font-medium text-emerald-700"
+          >
             {notice}
           </p>
         )}
